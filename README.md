@@ -1,5 +1,7 @@
 # CEDARScript Parser
 
+[![PyPI version](https://badge.fury.io/py/cedarscript-ast-parser.svg)](https://pypi.org/project/cedarscript-ast-parser/)
+
 CEDARScript Parser is a Python library for parsing and interpreting CEDARScript, a SQL-like language designed for concise code analysis, manipulation, and refactoring tasks.
 
 ## What is CEDARScript?
