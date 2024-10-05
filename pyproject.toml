@@ -28,6 +28,20 @@ requires-python = ">=3.12"
 
 [project.urls]
 Homepage = "https://github.com/CEDARScript/cedarscript-ast-parser"
+Documentation = "https://github.com/CEDARScript/cedarscript-ast-parser#readme"
+Repository = "https://github.com/CEDARScript/cedarscript-ast-parser.git"
+"Bug Tracker" = "https://github.com/CEDARScript/cedarscript-ast-parser/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "black>=22.0",
+    "isort>=5.0",
+    "flake8>=4.0",
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "cedarscript_ast_parser.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
