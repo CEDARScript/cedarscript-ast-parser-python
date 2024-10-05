@@ -11,6 +11,7 @@ setup(
     package_data={
         "cedarscript_ast_parser": ["*.so", "*.dylib", "*.dll"],
     },
+    include_package_data=True,
     author="Elifarley",
     author_email="elifarley@example.com",
     description="A library for CEDARScript AST parsing",
