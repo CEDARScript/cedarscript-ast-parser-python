@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cedarscript_ast_parser"
 version = "0.1.0"
-description = "A library for CEDARScript AST parsing"
+description = "A library for parsing and interpreting CEDARScript, a SQL-like language for code analysis and transformations"
 readme = "README.md"
 authors = [{ name = "Elifarley", email = "elifarley@example.com" }]
 license = { file = "LICENSE" }
@@ -17,8 +17,10 @@ classifiers = [
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Text Processing :: Linguistic",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Compilers",
 ]
-keywords = ["parser", "ast", "cedarscript", "code-editing"]
+keywords = ["parser", "ast", "cedarscript", "code-editing", "refactoring", "code-analysis", "sql-like", "ai-assisted-development"]
 dependencies = [
     "tree-sitter>=0.20.1",
 ]
