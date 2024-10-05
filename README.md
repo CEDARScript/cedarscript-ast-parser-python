@@ -29,6 +29,12 @@ You can install CEDARScript Parser using pip:
 pip install cedarscript_ast_parser
 ```
 
+To install the latest development version from TestPyPI:
+
+```
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple cedarscript_ast_parser
+```
+
 ## Usage
 
 Here's a quick example of how to use CEDARScript Parser:
