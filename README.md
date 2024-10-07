@@ -6,7 +6,7 @@
 
 ## What is CEDARScript?
 
-[CEDARScript](/CEDARScript/cedarscript-grammar#readme) (Concise Examination, Development, And Refactoring Script) is a domain-specific language that
+[CEDARScript](https://github.com/CEDARScript/cedarscript-grammar#readme) (Concise Examination, Development, And Refactoring Script) is a domain-specific language that
 aims to improve how AI coding assistants interact with codebases and communicate their code modification intentions.
 It provides a standardized way to express complex code modification and analysis operations, making it easier for 
 AI-assisted development tools to understand and execute these tasks.

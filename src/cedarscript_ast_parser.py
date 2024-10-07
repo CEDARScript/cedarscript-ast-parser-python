@@ -1,11 +1,8 @@
-import logging
-import os
-import sys
 from enum import StrEnum, auto
 from typing import TypeAlias, NamedTuple, Union
 
-from tree_sitter import Language, Parser
-
+from tree_sitter import Parser
+import cedarscript_grammar
 from dataclasses import dataclass
 
 __all__ = ['CEDARScriptASTParser', 'ParseError', 'Command']
@@ -240,25 +237,10 @@ def _generate_suggestion(error_node, code_text) -> str:
 
 class _CEDARScriptASTParserBase:
     def __init__(self):
-        """Set up the logger, load the Cedar language, and initialize the parser.
+        """Load the CEDARScript language, and initialize the parser.
         """
-
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel("DEBUG")
-
-        # Determine the appropriate library file based on the current architecture
-        if sys.platform.startswith('darwin'):
-            lib_name = 'libtree-sitter-cedar.dylib'
-        elif sys.platform.startswith('linux'):
-            lib_name = 'libtree-sitter-cedar.so'
-        else:
-            raise OSError(f"Unsupported platform: {sys.platform}")
-
-        cedar_language_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'vendor', lib_name))
         self.parser = Parser()
-        self.logger.warning(f"[{self.__class__}] Loading native CEDARScript parsing library from {cedar_language_path}")
-        self.language = Language(cedar_language_path, 'CEDARScript')
-        self.parser.set_language(self.language)
+        self.parser.set_language(cedarscript_grammar.language())
 
 
 class CEDARScriptASTParser(_CEDARScriptASTParserBase):
