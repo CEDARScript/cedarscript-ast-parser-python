@@ -1,4 +1,4 @@
-# CEDARScript Parser
+# CEDARScript AST Parser
 
 [![PyPI version](https://badge.fury.io/py/cedarscript-ast-parser.svg)](https://pypi.org/project/cedarscript-ast-parser/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/cedarscript-ast-parser.svg)](https://pypi.org/project/cedarscript-ast-parser/)
@@ -25,13 +25,7 @@ AI-assisted development tools to understand and execute these tasks.
 You can install CEDARScript Parser using pip:
 
 ```
-pip install cedarscript_ast_parser
-```
-
-To install the latest development version from TestPyPI:
-
-```
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple cedarscript_ast_parser
+pip install cedarscript-ast-parser
 ```
 
 ## Usage

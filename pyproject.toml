@@ -2,9 +2,6 @@
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-py-modules = ["cedarscript_ast_parser"]
-
 [project]
 name = "cedarscript-ast-parser"
 dynamic = ["version"]
@@ -46,8 +43,12 @@ dev = [
 [tool.setuptools.dynamic]
 version = {attr = "cedarscript_ast_parser.__version__"}
 
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = ["cedarscript_ast_parser"]
+
 [tool.setuptools.packages.find]
-where = ["."]
+where = ["src"]
 include = ["cedarscript_ast_parser*"]
 exclude = ["cedarscript_ast_parser.tests*"]
 namespaces = false
