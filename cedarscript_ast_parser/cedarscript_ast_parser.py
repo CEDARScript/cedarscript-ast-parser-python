@@ -5,9 +5,6 @@ from tree_sitter import Parser
 import cedarscript_grammar
 from dataclasses import dataclass
 
-__all__ = ['CEDARScriptASTParser', 'ParseError', 'Command']
-
-
 class ParseError(NamedTuple):
     command_ordinal: int
     message: str
