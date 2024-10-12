@@ -619,7 +619,8 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
                     lines.append(f"{' ' * (4 * indent)}{content.text}")
         return '\n'.join(lines)
 
-    def find_first_by_type(self, nodes: Sequence[any], child_type):
+    @staticmethod
+    def find_first_by_type(nodes: Sequence[any], child_type):
         if isinstance(child_type, list):
             for child in nodes:
                 if child.type in child_type:
