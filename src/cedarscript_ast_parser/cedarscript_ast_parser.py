@@ -74,7 +74,7 @@ class RelativeMarker(Marker):
             case RelativePositionType.AT:
                 pass
             case _:
-                result = f'{result} ({str(self.qualifier).replace('_', ' ')})'
+                result = f'{result} ({str(self.qualifier).replace("_", " ")})'
         return result
 
 
@@ -84,7 +84,7 @@ class Segment:
     end: RelativeMarker
 
     def __str__(self):
-        return f"segment from {self.start} to {self.end}"
+        return f"segment from ({self.start}) to ({self.end})"
 
 
 MarkerOrSegment: TypeAlias = Marker | Segment
