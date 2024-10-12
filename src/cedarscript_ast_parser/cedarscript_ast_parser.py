@@ -1,5 +1,6 @@
 from enum import StrEnum, auto
 from typing import TypeAlias, NamedTuple, Union
+from collections.abc import Sequence
 
 from tree_sitter import Parser
 import cedarscript_grammar
@@ -31,13 +32,22 @@ class BodyOrWhole(StrEnum):
 
 
 MarkerType = StrEnum('MarkerType', 'LINE VARIABLE FUNCTION CLASS')
-RelativePositionType = StrEnum('RelativePositionType', 'AT BEFORE AFTER INSIDE')
+RelativePositionType = StrEnum('RelativePositionType', 'AT BEFORE AFTER INSIDE_TOP INSIDE_BOTTOM')
+
+
+class MarkerCompatible:
+    def as_marker(self) -> 'Marker':
+        pass
 
 @dataclass
-class Marker:
+class Marker(MarkerCompatible):
     type: MarkerType
     value: str
     offset: int | None = None
+
+    @property
+    def as_marker(self) -> 'Marker':
+        return self
 
     def __str__(self):
         result = f"{self.type.value} '{self.value}'"
@@ -59,7 +69,7 @@ class RelativeMarker(Marker):
             case RelativePositionType.AT:
                 pass
             case _:
-                result = f'{result} ({self.qualifier})'
+                result = f'{result} ({self.qualifier.replace('_', ' ')})'
         return result
 
 
@@ -73,8 +83,8 @@ class Segment:
 
 
 MarkerOrSegment: TypeAlias = Marker | Segment
-Region: TypeAlias = BodyOrWhole | MarkerOrSegment
-RegionOrRelativeMarker: Region | RelativeMarker
+Region: TypeAlias = BodyOrWhole | Marker | Segment
+RegionOrRelativeMarker: BodyOrWhole | Marker | Segment | RelativeMarker
 # <file-or-identifier>
 
 
@@ -91,13 +101,18 @@ class SingleFileClause:
 
 
 @dataclass
-class IdentifierFromFile(SingleFileClause):
+class IdentifierFromFile(SingleFileClause, MarkerCompatible):
     where_clause: WhereClause
-    identifier_type: str  # VARIABLE, FUNCTION, CLASS
+    identifier_type: MarkerType  # VARIABLE, FUNCTION, CLASS (but not LINE)
     offset: int | None = None
 
+    @property
+    def as_marker(self) -> Marker:
+        # TODO Handle different values for field and operator in where_clause
+        return Marker(self.identifier_type, self.where_clause.value, self.offset)
+
     def __str__(self):
-        result = f"{self.identifier_type.lower()} (self.where_clause)"
+        result = f"{self.identifier_type.lower()} ({self.where_clause})"
         if self.offset is not None:
             result += f" at offset {self.offset}"
         return f"{result} from file {self.file_path}"
@@ -128,8 +143,12 @@ class DeleteClause(RegionClause):
 
 
 @dataclass
-class InsertClause:
+class InsertClause(MarkerCompatible):
     insert_position: RelativeMarker
+
+    @property
+    def as_marker(self) -> RelativeMarker:
+        return self.insert_position
 
 
 @dataclass
@@ -189,7 +208,7 @@ class MvFileCommand(FileCommand):
 class UpdateCommand(Command):
     target: FileOrIdentifierWithin
     action: EditingAction
-    content: str | None = None
+    content: str | tuple[Region, int | None] | None = None
 
     @property
     def files_to_change(self) -> tuple[str, ...]:
@@ -241,7 +260,7 @@ class _CEDARScriptASTParserBase:
 
 
 class CEDARScriptASTParser(_CEDARScriptASTParserBase):
-    def parse_script(self, code_text: str) -> tuple[list[Command], list[ParseError]]:
+    def parse_script(self, code_text: str) -> tuple[Sequence[Command], Sequence[ParseError]]:
         """
         Parses the CEDARScript code and returns a tuple containing:
         - A list of Command objects if parsing is successful.
@@ -315,14 +334,14 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
                 errors.extend(self._collect_parse_errors(child, code_text, command_ordinal))
         return errors
 
-    def _get_expected_tokens(self, error_node) -> list[str]:
+    def _get_expected_tokens(self, error_node) -> tuple[str]:
         """
         Provides expected tokens based on the error_node's context.
         """
         # Since Tree-sitter doesn't provide expected tokens directly,
         # you might need to implement this based on the grammar and error context.
         # For now, we'll return an empty list to simplify.
-        return []
+        return tuple()
 
     def parse_command(self, node):
         match node.type:
@@ -341,7 +360,7 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
 
     def parse_create_command(self, node):
         file_path = self.parse_singlefile_clause(self.find_first_by_type(node.children, 'singlefile_clause')).file_path
-        content = self.parse_content_clause(self.find_first_by_type(node.children, 'content_clause'))
+        content = self.parse_content(node)
         return CreateCommand(type='create', file_path=file_path, content=content)
 
     def parse_rm_file_command(self, node):
@@ -356,7 +375,7 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
     def parse_update_command(self, node):
         target = self.parse_update_target(node)
         action = self.parse_update_action(node)
-        content = self.parse_update_content(node)
+        content = self.parse_content(node)
         return UpdateCommand(type='update', target=target, action=action, content=content)
 
     def parse_update_target(self, node):
@@ -377,7 +396,7 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
                 raise ValueError(f"[parse_update_target] Invalid target: {invalid}")
 
     def parse_identifier_from_file(self, node):
-        identifier_type = node.children[0].type  # FUNCTION, CLASS, or VARIABLE
+        identifier_type = MarkerType(node.children[0].type.casefold())
         file_clause = self.find_first_by_type(node.named_children, 'singlefile_clause')
         where_clause = self.find_first_by_type(node.named_children, 'where_clause')
         offset_clause = self.find_first_by_type(node.named_children, 'offset_clause')
@@ -431,7 +450,7 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
         destination = self.find_first_by_type(node.named_children, 'update_move_clause_destination')
         insert_clause = self.find_first_by_type(destination.named_children, 'insert_clause')
         insert_clause = self.parse_insert_clause(insert_clause)
-        rel_indent = self.parse_relative_indentation(self.find_first_by_type(destination.named_children, 'relative_indentation'))
+        rel_indent = self.parse_relative_indentation(destination)
         # TODO to_other_file
         return MoveClause(
             region=source,
@@ -460,7 +479,11 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
                     node = node.named_children[0]
             case 'relpos_bai':
                 node = node.named_children[0]
-                qualifier = RelativePositionType(node.child(0).type.casefold())
+                main_type = node.child(0).type.casefold()
+                match main_type:
+                    case 'inside':
+                        main_type += '_' + node.child(2).type.casefold()
+                qualifier = RelativePositionType(main_type)
                 node = node.named_children[0]
             case 'relpos_beforeafter':
                 qualifier = RelativePositionType(node.child(0).type.casefold())
@@ -469,14 +492,14 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
                 node = node.named_children[0]
 
         match node.type.casefold():
-            case 'marker' | 'linemarker':
+            case 'marker' | 'linemarker' | 'identifiermarker':
                 result = self.parse_marker(node)
             case 'segment':
                 result = self.parse_segment(node)
             case BodyOrWhole.BODY | BodyOrWhole.WHOLE as bow:
                 result = BodyOrWhole(bow.lower())
-            case _ as invalid:
-                raise ValueError(f"[parse_region] Unexpected node type: {invalid}")
+            case _:
+                raise ValueError(f"Unexpected node type: {node.type}")
         if qualifier:
             result = RelativeMarker(qualifier=qualifier, type=result.type, value=result.value, offset=result.offset)
         return result
@@ -502,16 +525,24 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
             return None
         return int(self.find_first_by_type(node.children, 'number').text)
 
-    def parse_relative_indentation(self, node):
+    def parse_relative_indentation(self, node) -> int:
+        node = self.find_first_by_type(node.named_children, 'relative_indentation')
         if node is None:
             return None
-        return int(self.find_first_by_type(node.children, 'number').text)
+        return int(self.find_first_by_type(node.named_children, 'number').text)
 
-    def parse_update_content(self, node):
-        content_clause = self.find_first_by_type(node.children, 'content_clause')
-        if content_clause:
-            return self.parse_content_clause(content_clause)
-        return None
+    def parse_content(self, node) -> str | tuple[Region, int | None]:
+        content = self.find_first_by_type(node.named_children, ['content_clause', 'content_from_segment'])
+        if not content:
+            return None
+        match content.type:
+            case 'content_clause':
+                return self.parse_content_clause(content) # str
+            case 'content_from_segment':
+                return self.parse_content_from_segment_clause(content) # tuple[Region, int]
+            case _:
+                raise ValueError(f"Invalid content type: {content.type}")
+
 
     def parse_singlefile_clause(self, node):
         if node is None or node.type != 'singlefile_clause':
@@ -521,9 +552,7 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
             raise ValueError("No file_path found in singlefile_clause")
         return SingleFileClause(file_path=self.parse_string(path_node))
 
-    def parse_content_clause(self, node):
-        if node is None or node.type != 'content_clause':
-            raise ValueError("Expected content_clause node")
+    def parse_content_clause(self, node) -> str:
         child_type = ['string', 'relative_indent_block', 'multiline_string']
         content_node = self.find_first_by_type(node.children, child_type)
         if content_node is None:
@@ -534,6 +563,15 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
             return self.parse_relative_indent_block(content_node)
         elif content_node.type == 'multiline_string':
             return self.parse_multiline_string(content_node)
+
+    def parse_content_from_segment_clause(self, node) -> tuple[Region, int | None]:
+        child_type = ['marker_or_segment']
+        content_node = self.find_first_by_type(node.children, child_type)
+        # TODO parse relative indentation
+        if content_node is None:
+            raise ValueError("No content found in content_from_segment")
+        rel_indent = self.parse_relative_indentation(node)
+        return self.parse_region(content_node), rel_indent
 
     def parse_to_value_clause(self, node):
         if node is None or node.type != 'to_value_clause':
@@ -561,7 +599,7 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
     def parse_multiline_string(self, node):
         return node.text.decode('utf8').strip("'''").strip('"""')
 
-    def parse_relative_indent_block(self, node):
+    def parse_relative_indent_block(self, node) -> str:
         lines = []
         for line_node in node.children:
             if line_node.type == 'relative_indent_line':
@@ -572,7 +610,7 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
                     lines.append(f"{' ' * (4 * indent)}{content.text}")
         return '\n'.join(lines)
 
-    def find_first_by_type(self, nodes: list[any], child_type):
+    def find_first_by_type(self, nodes: Sequence[any], child_type):
         if isinstance(child_type, list):
             for child in nodes:
                 if child.type in child_type:
