@@ -42,6 +42,7 @@ dev = [
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+packages = ["cedarscript_ast_parser"]
 
 [tool.setuptools_scm]
 # To override version:
