@@ -55,7 +55,7 @@ class Marker(MarkerCompatible):
         return self
 
     def __str__(self):
-        result = f"{self.type.value} '{self.value}'"
+        result = f"{self.type.value} '{self.value.strip()}'"
         if self.offset is not None:
             result += f" at offset {self.offset}"
         return result
@@ -107,17 +107,20 @@ class SingleFileClause:
 
 @dataclass
 class IdentifierFromFile(SingleFileClause, MarkerCompatible):
-    where_clause: WhereClause
     identifier_type: MarkerType  # VARIABLE, FUNCTION, CLASS (but not LINE)
+    name: str
+    where_clause: WhereClause
     offset: int | None = None
 
     @property
     def as_marker(self) -> Marker:
         # TODO Handle different values for field and operator in where_clause
-        return Marker(self.identifier_type, self.where_clause.value, self.offset)
+        return Marker(self.identifier_type, self.name or self.where_clause.value, self.offset)
 
     def __str__(self):
-        result = f"{str(self.identifier_type).lower()} ({self.where_clause})"
+        wc = self.where_clause
+        if wc: wc = f' ({wc})'
+        result = f"{str(self.identifier_type).lower()} {self.name}{wc}"
         if self.offset is not None:
             result += f" at offset {self.offset}"
         return f"{result} from file {self.file_path}"
@@ -402,22 +405,28 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
                 raise ValueError(f"[parse_update_target] Invalid target: {invalid}")
 
     def parse_identifier_from_file(self, node):
-        identifier_type = MarkerType(node.children[0].type.casefold())
+        identifier_marker = self.find_first_by_type(node.named_children, 'identifierMarker')
+        identifier_type = MarkerType(identifier_marker.children[0].type.casefold())
+        name = self.parse_string(identifier_marker.named_children[0])
+        offset_clause = self.find_first_by_type(identifier_marker.named_children, 'offset_clause')
         file_clause = self.find_first_by_type(node.named_children, 'singlefile_clause')
         where_clause = self.find_first_by_type(node.named_children, 'where_clause')
-        offset_clause = self.find_first_by_type(node.named_children, 'offset_clause')
 
-        if not file_clause or not where_clause:
+        if not file_clause or not name:
             raise ValueError("Invalid identifier_from_file clause")
 
         file_path = self.parse_singlefile_clause(file_clause).file_path
-        where = self.parse_where_clause(where_clause)
         offset = self.parse_offset_clause(offset_clause) if offset_clause else None
+        where = self.parse_where_clause(where_clause)
 
-        return IdentifierFromFile(identifier_type=identifier_type, file_path=file_path,
-                                  where_clause=where, offset=offset)
+        return IdentifierFromFile(file_path=file_path,
+            identifier_type=identifier_type,  name=name, offset=offset,
+            where_clause=where
+        )
 
     def parse_where_clause(self, node):
+        if not node:
+            return None
         condition = self.find_first_by_type(node.children, 'condition')
         if not condition:
             raise ValueError("No condition found in where clause")
@@ -596,11 +605,18 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
         text = node.text.decode('utf8')
         match node.type.casefold():
             case 'raw_string':
-                text = text.strip('"\'')
+                match text:
+                    case x if x.startswith("r'''") or x.startswith('r"""'):
+                        text = text[4:-3]
+                    case x if x.startswith("r'") or x.startswith('r"'):
+                        text = text[3:-1]
+                    case _:
+                        raise ValueError(f"Invalid raw string: `{text}`")
             case 'single_quoted_string':
-                text = text.replace("\\'", "'").replace('\\"', '"').strip('"\'')
+                text = text[1:-1]  # Remove surrounding quotes
+                text = text.replace("\\'", "'").replace('\\"', '"').replace("\\t", '\t')
             case 'multi_line_string':
-                text = text.removeprefix("'''").removeprefix('"""').removesuffix("'''").removesuffix('"""')
+                text = text[3:-3]
 
         return text
 

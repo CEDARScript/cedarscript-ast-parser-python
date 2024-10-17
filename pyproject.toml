@@ -2,6 +2,10 @@
 requires = ["setuptools>=61.0", "wheel", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
+# To build both source and wheel distributions:
+# python -m build --sdist --wheel
+# This creates both .tar.gz (source) and .whl (wheel) files in the 'dist' directory
+
 [project]
 name = "cedarscript-ast-parser"
 dynamic = ["version"]
@@ -22,7 +26,7 @@ classifiers = [
 ]
 keywords = ["parser", "ast", "cedarscript", "code-editing", "refactoring", "code-analysis", "sql-like", "ai-assisted-development"]
 dependencies = [
-    "cedarscript-grammar>=0.0.10",
+    "cedarscript-grammar>=0.0.11",
 ]
 requires-python = ">=3.8"
 
