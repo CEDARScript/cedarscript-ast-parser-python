@@ -1,14 +1,14 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=61.0", "wheel", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "cedarscript-ast-parser"
 dynamic = ["version"]
 description = "A library for parsing and interpreting CEDARScript, a SQL-like language for code analysis and transformations"
-readme = "README.md"
 authors = [{ name = "Elifarley", email = "cedarscript@orgecc.com" }]
-license = { file = "LICENSE" }
+readme = "README.md"
+license = {text = "MIT"}
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
@@ -22,7 +22,7 @@ classifiers = [
 ]
 keywords = ["parser", "ast", "cedarscript", "code-editing", "refactoring", "code-analysis", "sql-like", "ai-assisted-development"]
 dependencies = [
-    "cedarscript-grammar>=0.0.9",
+    "cedarscript-grammar>=0.0.10",
 ]
 requires-python = ">=3.8"
 
@@ -40,15 +40,34 @@ dev = [
     "flake8>=4.0",
 ]
 
-[tool.setuptools.dynamic]
-version = {attr = "cedarscript_ast_parser.__version__"}
-
 [tool.setuptools]
 package-dir = {"" = "src"}
-py-modules = ["cedarscript_ast_parser"]
+
+[tool.setuptools_scm]
+# To override version:
+# >>> SETUPTOOLS_SCM_PRETEND_VERSION=0.0.2 python -m build
+# To dry-run and see version:
+# >>> python -m setuptools_scm
+write_to = "src/cedarscript_ast_parser/_version.py"
+# Append .post{number of commits} to your version if there are commits after the last tag.
+version_scheme = "post-release"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["cedarscript_ast_parser*"]
 exclude = ["cedarscript_ast_parser.tests*"]
 namespaces = false
+
+[tool.black]
+line-length = 100
+target-version = ['py39']
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.8"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
