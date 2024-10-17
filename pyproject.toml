@@ -42,7 +42,12 @@ dev = [
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-packages = ["cedarscript_ast_parser"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["cedarscript_ast_parser*"]
+exclude = ["cedarscript_ast_parser.tests*"]
+namespaces = false
 
 [tool.setuptools_scm]
 # To override version:
@@ -52,12 +57,6 @@ packages = ["cedarscript_ast_parser"]
 write_to = "src/cedarscript_ast_parser/_version.py"
 # Append .post{number of commits} to your version if there are commits after the last tag.
 version_scheme = "post-release"
-
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["cedarscript_ast_parser*"]
-exclude = ["cedarscript_ast_parser.tests*"]
-namespaces = false
 
 [tool.black]
 line-length = 100
