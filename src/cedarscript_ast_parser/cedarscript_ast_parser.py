@@ -264,8 +264,7 @@ class _CEDARScriptASTParserBase:
     def __init__(self):
         """Load the CEDARScript language, and initialize the parser.
         """
-        self.parser = Parser()
-        self.parser.set_language(cedarscript_grammar.language())
+        self.parser = Parser(cedarscript_grammar.language())
 
 
 class CEDARScriptASTParser(_CEDARScriptASTParserBase):
