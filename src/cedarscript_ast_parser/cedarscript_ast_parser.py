@@ -264,7 +264,18 @@ class _CEDARScriptASTParserBase:
     def __init__(self):
         """Load the CEDARScript language, and initialize the parser.
         """
-        self.parser = Parser(cedarscript_grammar.language())
+        from importlib.metadata import version
+        from packaging import version as v
+
+        package_version = version('tree_sitter')
+        parsed_version = v.parse(package_version)
+
+        match parsed_version:
+            case x if x <= v.parse('0.21.3'):
+                self.parser = Parser()
+                self.parser.set_language(cedarscript_grammar.language())
+            case _:
+                self.parser = Parser(cedarscript_grammar.language())
 
 
 class CEDARScriptASTParser(_CEDARScriptASTParserBase):
@@ -276,9 +287,7 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
         """
         command_ordinal = 1
         try:
-            # Parse the code text
-            tree = self.parser.parse(bytes(code_text, 'utf8'))
-            root_node = tree.root_node
+            root_node = self.parser.parse(bytes(code_text, 'utf8')).root_node
 
             errors = self._collect_parse_errors(root_node, code_text, command_ordinal)
             if errors:
@@ -547,7 +556,7 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
             return None
         return int(self.find_first_by_type(node.named_children, 'number').text)
 
-    def parse_content(self, node) -> str | tuple[Region, int | None]:
+    def parse_content(self, node) -> str | tuple[Region, int | None] | None:
         content = self.find_first_by_type(node.named_children, ['content_clause', 'content_from_segment'])
         if not content:
             return None
