@@ -1,0 +1,54 @@
+name: Windows Package Test
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  # Optional: manual trigger
+  workflow_dispatch:
+
+jobs:
+  test-windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+        architecture: ['x64']
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: ~\AppData\Local\pip\Cache
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+
+      - name: Set up Python ${{ matrix.python-version }} ${{ matrix.architecture }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: ${{ matrix.architecture }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov
+          pip install -e .
+
+      - name: Run tests
+        run: |
+          pytest --cov=cedarscript_ast_parser tests/
+      - name: Test PyPI installation
+        run: |
+          pip uninstall cedarscript-ast-parser -y
+          pip install cedarscript-ast-parser
+          python -c "from cedarscript_ast_parser import CEDARScriptASTParser; CEDARScriptASTParser()"
+
+      # Optional: Upload artifacts if your package generates any
+      - name: Upload artifacts
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-artifacts
+          path: |
+            ./*.log
+            ./tests/results
