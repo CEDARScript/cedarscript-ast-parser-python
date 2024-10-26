@@ -35,7 +35,7 @@ class BodyOrWhole(StrEnum):
     WHOLE = auto()
 
 
-MarkerType = StrEnum('MarkerType', 'LINE VARIABLE FUNCTION CLASS')
+MarkerType = StrEnum('MarkerType', 'LINE VARIABLE FUNCTION METHOD CLASS')
 RelativePositionType = StrEnum('RelativePositionType', 'AT BEFORE AFTER INSIDE_TOP INSIDE_BOTTOM')
 
 
@@ -46,6 +46,9 @@ class MarkerCompatible:
 
 @dataclass
 class Marker(MarkerCompatible):
+    """
+    See Marker.to_search_range
+    """
     type: MarkerType
     value: str
     offset: int | None = None
@@ -428,9 +431,9 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
         where = self.parse_where_clause(where_clause)
 
         return IdentifierFromFile(file_path=file_path,
-            identifier_type=identifier_type,  name=name, offset=offset,
-            where_clause=where
-        )
+                                  identifier_type=identifier_type,  name=name, offset=offset,
+                                  where_clause=where
+                                  )
 
     def parse_where_clause(self, node):
         if not node:
