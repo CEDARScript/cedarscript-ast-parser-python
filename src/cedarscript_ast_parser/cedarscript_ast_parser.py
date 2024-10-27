@@ -47,18 +47,34 @@ class MarkerCompatible:
 @dataclass
 class Marker(MarkerCompatible):
     """
-    See Marker.to_search_range
+    A marker can be one of:
+    - LINE with string/number value
+    - LINE REGEX with regex pattern
+    - LINE PREFIX with prefix string
+    - LINE SUFFIX with suffix string
+    - VARIABLE with name
+    - FUNCTION with name
+    - CLASS with name
+    See also: Marker.to_search_range
     """
     type: MarkerType
     value: str
     offset: int | None = None
+    marker_subtype: str | None = None  # 'REGEX', 'PREFIX', 'SUFFIX' for LINE type
 
     @property
     def as_marker(self) -> 'Marker':
         return self
 
     def __str__(self):
-        result = f"{self.type.value} '{self.value.strip()}'"
+        result = self.type.value
+        match self.marker_subtype:
+            case 'string' | None:
+                pass
+            case _:
+                result += self.marker_subtype.value
+
+        result += f" '{self.value.strip()}'"
         if self.offset is not None:
             result += f" at offset {self.offset}"
         return result
@@ -533,13 +549,37 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
         return result
 
     def parse_marker(self, node) -> Marker:
-        # TODO Fix: handle line marker as well
+        # Handle marker inside marker_or_segment
         if node.type.casefold() == 'marker':
             node = node.named_children[0]
-        marker_type = node.children[0].type  # LINE, VARIABLE, FUNCTION, or CLASS
-        value = self.parse_string(self.find_first_by_type(node.named_children, 'string'))
+        
+        marker_type = node.children[0].type  # LINE, VARIABLE, FUNCTION, METHOD or CLASS
+        marker_subtype = None
+        value = None
+
+        if marker_type != 'LINE':  # VARIABLE, FUNCTION, METHOD or CLASS
+            value = self.parse_string(self.find_first_by_type(node.named_children, 'string'))
+        # Handle the different marker types
+        else:
+            # Get the second child which is either a string/number or a subtype specifier
+            second_child = node.children[1]
+            marker_subtype = second_child.type
+            if second_child.type in ['string', 'number']:
+                match second_child.type:
+                    case 'string':
+                        value = self.parse_string(second_child)
+                    case _:
+                        value = second_child.text.decode('utf8')
+            else:  # REGEX, PREFIX, or SUFFIX
+                value = self.parse_string(node.children[2])
+
         offset = self.parse_offset_clause(self.find_first_by_type(node.named_children, 'offset_clause'))
-        return Marker(type=MarkerType(marker_type.casefold()), value=value, offset=offset)
+        return Marker(
+            type=MarkerType(marker_type.casefold()),
+            marker_subtype=marker_subtype,
+            value=value,
+            offset=offset
+        )
 
     def parse_segment(self, node) -> Segment:
         relpos_start = self.find_first_by_type(node.named_children, 'relpos_segment_start').children[1]
