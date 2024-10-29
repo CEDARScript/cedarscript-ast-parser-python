@@ -269,7 +269,7 @@ def _generate_suggestion(error_node, code_text) -> str:
         return "Please check the syntax near the error."
 
     parent_type = parent.type
-    if parent_type == 'content_clause':
+    if parent_type == 'content_literal':
         return "Ensure the content block is properly enclosed with matching quotes (''' or \"\")."
     if parent_type == 'update_command':
         return "An action clause ('REPLACE', 'INSERT', 'DELETE') is expected in the 'UPDATE' command."
@@ -600,12 +600,12 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
         return int(self.find_first_by_type(node.named_children, 'number').text)
 
     def parse_content(self, node) -> str | tuple[Region, int | None] | None:
-        content = self.find_first_by_type(node.named_children, ['content_clause', 'content_from_segment'])
+        content = self.find_first_by_type(node.named_children, ['content_literal', 'content_from_segment'])
         if not content:
             return None
         match content.type:
-            case 'content_clause':
-                return self.parse_content_clause(content)  # str
+            case 'content_literal':
+                return self.parse_content_literal(content)  # str
             case 'content_from_segment':
                 return self.parse_content_from_segment_clause(content)  # tuple[Region, int]
             case _:
@@ -619,11 +619,11 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
             raise ValueError("No file_path found in singlefile_clause")
         return SingleFileClause(file_path=self.parse_string(path_node))
 
-    def parse_content_clause(self, node) -> str:
+    def parse_content_literal(self, node) -> str:
         child_type = ['string', 'relative_indent_block', 'multiline_string']
         content_node = self.find_first_by_type(node.children, child_type)
         if content_node is None:
-            raise ValueError("No content found in content_clause")
+            raise ValueError("No content found in content_literal")
         if content_node.type == 'string':
             return self.parse_string(content_node)
         elif content_node.type == 'relative_indent_block':
