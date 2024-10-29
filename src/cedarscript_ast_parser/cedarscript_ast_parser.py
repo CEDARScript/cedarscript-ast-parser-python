@@ -36,7 +36,7 @@ class BodyOrWhole(StrEnum):
 
 
 MarkerType = StrEnum('MarkerType', 'LINE VARIABLE FUNCTION METHOD CLASS')
-RelativePositionType = StrEnum('RelativePositionType', 'AT BEFORE AFTER INSIDE_TOP INSIDE_BOTTOM')
+RelativePositionType = StrEnum('RelativePositionType', 'AT BEFORE AFTER INTO_TOP INTO_BOTTOM')
 
 
 class MarkerCompatible:
@@ -525,7 +525,8 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
                 node = node.named_children[0]
                 main_type = node.child(0).type.casefold()
                 match main_type:
-                    case 'inside':
+                    case 'into':
+                        # INTO_TOP, INTO_BOTTOM
                         main_type += '_' + node.child(2).type.casefold()
                 qualifier = RelativePositionType(main_type)
                 node = node.named_children[0]
