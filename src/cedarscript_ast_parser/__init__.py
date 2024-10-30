@@ -5,15 +5,15 @@ from .cedarscript_ast_parser import (
     CreateCommand, RmFileCommand, MvFileCommand, UpdateCommand,
     SelectCommand, IdentifierFromFile, SingleFileClause, Segment, Marker, BodyOrWhole, MarkerType, RelativeMarker,
     RelativePositionType, MoveClause, DeleteClause, InsertClause, ReplaceClause, EditingAction, Region,
-    WhereClause, RegionClause
+    WhereClause, RegionClause, EdScript
 )
 
 __all__ = [
     "__version__",
     "CEDARScriptASTParser", "ParseError", "Command",
     "CreateCommand", "RmFileCommand", "MvFileCommand", "UpdateCommand",
-    "SelectCommand", "IdentifierFromFile", "SingleFileClause", "Segment", "Marker", "BodyOrWhole", "MarkerType", "RelativeMarker",
-    "RelativePositionType", "MoveClause", "DeleteClause", "InsertClause", "ReplaceClause", "EditingAction", "Region",
-    "WhereClause", "RegionClause"
+    "SelectCommand", "IdentifierFromFile", "SingleFileClause", "Segment", "Marker", "BodyOrWhole", "MarkerType",
+    "RelativeMarker", "RelativePositionType", "MoveClause", "DeleteClause", "InsertClause", "ReplaceClause",
+    "EditingAction", "Region", "WhereClause", "RegionClause", "EdScript"
 ]
 

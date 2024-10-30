@@ -11,8 +11,8 @@ test:
 
 dist: test
 	scripts/check-version.sh
-	rm -rf dist/
+	rm -rf dist/cedarscript_*.whl dist/cedarscript_*.tar.gz
 	python -m build && twine upload dist/*
 
 clean:
-	rm -f /dist/
+	rm -rfv out dist/cedarscript_*.whl dist/cedarscript_*.tar.gz build/bdist.* build/lib/cedarscript*

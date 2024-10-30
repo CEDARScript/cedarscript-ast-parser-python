@@ -1,10 +1,10 @@
-from enum import StrEnum, auto
-from typing import TypeAlias, NamedTuple, Union
 from collections.abc import Sequence
-
-from tree_sitter import Parser
-import cedarscript_grammar
 from dataclasses import dataclass
+from enum import StrEnum, auto
+from typing import TypeAlias, NamedTuple, Union, Optional
+
+import cedarscript_grammar
+from tree_sitter import Parser
 
 
 class ParseError(NamedTuple):
@@ -72,7 +72,7 @@ class Marker(MarkerCompatible):
             case 'string' | None:
                 pass
             case _:
-                result += self.marker_subtype.value
+                result += self.marker_subtype
 
         result += f" '{self.value.strip()}'"
         if self.offset is not None:
@@ -138,7 +138,8 @@ class IdentifierFromFile(SingleFileClause, MarkerCompatible):
 
     def __str__(self):
         wc = self.where_clause
-        if wc: wc = f' ({wc})'
+        if wc:
+            wc = f' ({wc})'
         result = f"{str(self.identifier_type).lower()} {self.name}{wc}"
         if self.offset is not None:
             result += f" at offset {self.offset}"
@@ -233,10 +234,50 @@ class MvFileCommand(FileCommand):
 
 
 @dataclass
+class LoopControl(StrEnum):
+    BREAK = 'BREAK'
+    CONTINUE = 'CONTINUE'
+
+
+@dataclass
+class CaseWhen:
+    """Represents a WHEN condition in a CASE statement"""
+    empty: bool = False
+    regex: Optional[str] = None
+    prefix: Optional[str] = None
+    suffix: Optional[str] = None
+    indent_level: Optional[int] = None
+    line_number: Optional[int] = None
+
+
+@dataclass
+class CaseAction:
+    """Represents a THEN action in a CASE statement"""
+    loop_control: Optional[LoopControl] = None
+    remove: bool = False
+    replace: Optional[str] = None
+    indent: Optional[int] = None
+    content: Optional[str | tuple[Region, int | None]] = None
+
+
+@dataclass
+class CaseStatement:
+    """Represents a CASE statement with when-then pairs and optional else"""
+    cases: list[tuple[CaseWhen, CaseAction]]
+    else_action: Optional[CaseAction] = None
+
+
+@dataclass
+class EdScript:
+    """Represents an ED script content"""
+    script: str
+
+
+@dataclass
 class UpdateCommand(Command):
     target: FileOrIdentifierWithin
     action: EditingAction
-    content: str | tuple[Region, int | None] | None = None
+    content: str | tuple[Region, int | None] | EdScript | CaseStatement | None = None
 
     @property
     def files_to_change(self) -> tuple[str, ...]:
@@ -601,7 +642,9 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
         return int(self.find_first_by_type(node.named_children, 'number').text)
 
     def parse_content(self, node) -> str | tuple[Region, int | None] | None:
-        content = self.find_first_by_type(node.named_children, ['content_literal', 'content_from_segment'])
+        content = self.find_first_by_type(node.named_children, [
+            'content_literal', 'content_from_segment', 'ed_stmt', 'case_stmt'
+        ])
         if not content:
             return None
         match content.type:
@@ -609,8 +652,88 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
                 return self.parse_content_literal(content)  # str
             case 'content_from_segment':
                 return self.parse_content_from_segment_clause(content)  # tuple[Region, int]
+            case 'ed_stmt':
+                return self.parse_ed_stmt(content)  # EdScript
+            case 'case_stmt':
+                return self.parse_case_stmt(content)  # CaseStatement
             case _:
                 raise ValueError(f"Invalid content type: {content.type}")
+
+    def parse_case_stmt(self, node) -> CaseStatement:
+        """Parse a CASE statement"""
+        cases = []
+        
+        # Parse all WHEN-THEN pairs
+        current_when = None
+        for child in node.children:
+            match child.type:
+                case 'case_when':
+                    current_when = self.parse_case_when(child)
+                case 'case_action' if current_when is not None:
+                    action = self.parse_case_action(child)
+                    cases.append((current_when, action))
+                    current_when = None
+
+        # Parse optional ELSE clause
+        else_action = None
+        else_node = self.find_first_by_field_name(node, 'else')
+        if else_node:
+            else_action = self.parse_case_action(else_node)
+
+        return CaseStatement(cases=cases, else_action=else_action)
+
+    def parse_case_when(self, node) -> CaseWhen:
+        """Parse a WHEN clause in a CASE statement"""
+        when = CaseWhen()
+        
+        if self.find_first_by_field_name(node, 'empty'):
+            when.empty = True
+        elif regex := self.find_first_by_field_name(node, 'regex'):
+            when.regex = self.parse_string(regex)
+        elif prefix := self.find_first_by_field_name(node, 'prefix'):
+            when.prefix = self.parse_string(prefix)
+        elif suffix := self.find_first_by_field_name(node, 'suffix'):
+            when.suffix = self.parse_string(suffix)
+        elif indent := self.find_first_by_field_name(node, 'indent_level'):
+            when.indent_level = int(indent.text)
+        elif line_num := self.find_first_by_field_name(node, 'line_number'):
+            when.line_number = int(line_num.text)
+            
+        return when
+
+    def parse_case_action(self, node) -> CaseAction:
+        """Parse a THEN clause in a CASE statement"""
+        action = CaseAction()
+        
+        # Parse loop control if present
+        loop_control = self.find_first_by_type(node.children, 'loop_control')
+        if loop_control:
+            if self.find_first_by_type(loop_control.children, 'loop_break'):
+                action.loop_control = LoopControl.BREAK
+            elif self.find_first_by_type(loop_control.children, 'loop_continue'):
+                action.loop_control = LoopControl.CONTINUE
+
+        # Parse other action types
+        if self.find_first_by_field_name(node, 'remove'):
+            action.remove = True
+        elif replace := self.find_first_by_field_name(node, 'replace'):
+            action.replace = self.parse_string(replace)
+        elif indent := self.find_first_by_field_name(node, 'indent'):
+            action.indent = int(indent.text)
+        else:
+            # Check for content replacement
+            content = self.find_first_by_type(node.children, ['content_literal', 'content_from_segment'])
+            if content:
+                action.content = self.parse_content(content)
+
+        return action
+
+    def parse_ed_stmt(self, node) -> EdScript:
+        """Parse an ED script statement"""
+        ed_script = self.find_first_by_type(node.children, 'string')
+        if ed_script is None:
+            raise ValueError("No ED script found in ed_stmt")
+        return EdScript(script=self.parse_string(ed_script))
 
     def parse_singlefile_clause(self, node):
         if node is None or node.type != 'singlefile_clause':

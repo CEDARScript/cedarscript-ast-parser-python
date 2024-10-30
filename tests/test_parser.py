@@ -1,4 +1,3 @@
-import pytest
 from cedarscript_ast_parser import CEDARScriptASTParser
 
 
