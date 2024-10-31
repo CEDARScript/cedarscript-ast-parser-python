@@ -255,7 +255,8 @@ class CaseAction:
     """Represents a THEN action in a CASE statement"""
     loop_control: LoopControl | None = None
     remove: bool = False
-    replace: str | None = None
+    pattern: str | None = None  # For SUB command pattern
+    repl: str | None = None    # For SUB command replacement
     indent: int | None = None
     content: Optional[str | tuple[Region, int | None]] = None
 
@@ -716,8 +717,10 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
         # Parse other action types
         if self.find_first_by_field_name(node, 'remove'):
             action.remove = True
-        elif replace := self.find_first_by_field_name(node, 'replace'):
-            action.replace = self.parse_string(replace)
+        elif pattern := self.find_first_by_field_name(node, 'pattern'):
+            action.pattern = self.parse_string(pattern)
+            if repl := self.find_first_by_field_name(node, 'repl'):
+                action.repl = self.parse_string(repl)
         elif indent := self.find_first_by_field_name(node, 'indent'):
             action.indent = int(indent.text)
         else:
