@@ -5,7 +5,7 @@ from .cedarscript_ast_parser import (
     CreateCommand, RmFileCommand, MvFileCommand, UpdateCommand,
     SelectCommand, IdentifierFromFile, SingleFileClause, Segment, Marker, BodyOrWhole, MarkerType, RelativeMarker,
     RelativePositionType, MoveClause, DeleteClause, InsertClause, ReplaceClause, EditingAction, Region,
-    WhereClause, RegionClause, EdScript
+    WhereClause, RegionClause, EdScript, CaseStatement, CaseWhen, CaseAction, LoopControl
 )
 
 __all__ = [
@@ -14,6 +14,7 @@ __all__ = [
     "CreateCommand", "RmFileCommand", "MvFileCommand", "UpdateCommand",
     "SelectCommand", "IdentifierFromFile", "SingleFileClause", "Segment", "Marker", "BodyOrWhole", "MarkerType",
     "RelativeMarker", "RelativePositionType", "MoveClause", "DeleteClause", "InsertClause", "ReplaceClause",
-    "EditingAction", "Region", "WhereClause", "RegionClause", "EdScript"
+    "EditingAction", "Region", "WhereClause", "RegionClause", "EdScript", "CaseStatement", "CaseWhen", "CaseAction",
+    "LoopControl"
 ]
 
