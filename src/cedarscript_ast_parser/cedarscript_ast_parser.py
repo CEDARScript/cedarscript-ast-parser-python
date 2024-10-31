@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum, auto
 from typing import TypeAlias, NamedTuple, Union, Optional
-
+import re
 import cedarscript_grammar
 from tree_sitter import Parser
 
@@ -243,20 +243,20 @@ class LoopControl(StrEnum):
 class CaseWhen:
     """Represents a WHEN condition in a CASE statement"""
     empty: bool = False
-    regex: Optional[str] = None
-    prefix: Optional[str] = None
-    suffix: Optional[str] = None
-    indent_level: Optional[int] = None
-    line_number: Optional[int] = None
+    regex: str | None = None
+    prefix: str | None = None
+    suffix: str | None = None
+    indent_level: int | None = None
+    line_number: int | None = None
 
 
 @dataclass
 class CaseAction:
     """Represents a THEN action in a CASE statement"""
-    loop_control: Optional[LoopControl] = None
+    loop_control: LoopControl | None = None
     remove: bool = False
-    replace: Optional[str] = None
-    indent: Optional[int] = None
+    replace: str | None = None
+    indent: int | None = None
     content: Optional[str | tuple[Region, int | None]] = None
 
 
@@ -689,7 +689,7 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
         if self.find_first_by_field_name(node, 'empty'):
             when.empty = True
         elif regex := self.find_first_by_field_name(node, 'regex'):
-            when.regex = self.parse_string(regex)
+            when.regex = re.compile(self.parse_string(regex))
         elif prefix := self.find_first_by_field_name(node, 'prefix'):
             when.prefix = self.parse_string(prefix)
         elif suffix := self.find_first_by_field_name(node, 'suffix'):
@@ -784,12 +784,12 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
                     case x if x.startswith("r'''") or x.startswith('r"""'):
                         text = text[4:-3]
                     case x if x.startswith("r'") or x.startswith('r"'):
-                        text = text[3:-1]
+                        text = text[2:-1]
                     case _:
                         raise ValueError(f"Invalid raw string: `{text}`")
             case 'single_quoted_string':
                 text = text[1:-1]  # Remove surrounding quotes
-                text = text.replace("\\'", "'").replace('\\"', '"').replace("\\t", '\t')
+                text = text.replace(r"\'", "'").replace(r'\"', '"').replace(r"\t", '\t').replace("\\\\", "\\")
             case 'multi_line_string':
                 text = text[3:-3]
 
