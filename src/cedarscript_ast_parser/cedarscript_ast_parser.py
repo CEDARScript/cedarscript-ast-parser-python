@@ -137,7 +137,7 @@ class IdentifierFromFile(SingleFileClause, MarkerCompatible):
         return Marker(self.identifier_type, self.name or self.where_clause.value, self.offset)
 
     def __str__(self):
-        wc = self.where_clause
+        wc = self.where_clause or ''
         if wc:
             wc = f' ({wc})'
         result = f"{str(self.identifier_type).lower()} {self.name}{wc}"
