@@ -60,7 +60,7 @@ class Marker(MarkerCompatible):
     See also: Marker.to_search_range
     """
     type: MarkerType
-    value: str
+    value: str | int | None
     offset: int | None = None
 
     # See `line_base`
@@ -69,6 +69,15 @@ class Marker(MarkerCompatible):
     @property
     def as_marker(self) -> 'Marker':
         return self
+
+    def with_qualifier(self, qualifier: RelativePositionType):
+        return RelativeMarker(
+            qualifier=qualifier,
+            type=self.type,
+            value=self.value,
+            offset=self.offset,
+            marker_subtype = self.marker_subtype
+        ) if qualifier else self
 
     def __str__(self):
         result = self.type.value
@@ -81,9 +90,9 @@ class Marker(MarkerCompatible):
                 result += f' {self.marker_subtype}'
 
         if self.marker_subtype != 'empty':
-            result += f" '{self.value.strip()}'"
+            result += f" '{str(self.value).strip()}'"
         if self.offset is not None:
-            result += f" at offset {self.offset}"
+            result += f" ^{self.offset}"
         return result
 
 
@@ -110,7 +119,7 @@ class Segment:
     end: RelativeMarker
 
     def __str__(self):
-        return f"segment from ({self.start}) to ({self.end})"
+        return f"segment from [{self.start}] to [{self.end}]"
 
 
 MarkerOrSegment: TypeAlias = Marker | Segment
@@ -596,9 +605,7 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
                 result = BodyOrWhole(bow.lower())
             case _:
                 raise ValueError(f"Unexpected node type: {node.type}")
-        if qualifier:
-            result = RelativeMarker(qualifier=qualifier, type=result.type, value=result.value, offset=result.offset)
-        return result
+        return result.with_qualifier(qualifier) if qualifier else result
 
     def parse_marker(self, node) -> Marker:
         # Handle marker inside marker_or_segment
@@ -622,8 +629,8 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
             marker_type = node.children[0].type.casefold()
             value = self.find_primitive(node)
 
-        node1 = self.find_first_by_type(node.named_children, 'offset_clause')
-        offset = self.find_primitive(node1)
+        offset = self.find_first_by_type(node.named_children, 'offset_clause')
+        offset = self.find_primitive(offset)
         return Marker(
             type=MarkerType(marker_type.casefold()),
             marker_subtype=marker_subtype,
@@ -705,10 +712,10 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
             when.empty = True
 
         elif indent := self.find_first_by_field_name(node, 'indent_level'):
-            when.indent_level = int(indent.text)
+            when.indent_level = int(indent.text.decode('utf8'))
 
         elif line_num := self.find_first_by_field_name(node, 'line_number'):
-            when.line_number = int(line_num.text)
+            when.line_number = int(line_num.text.decode('utf8'))
 
         elif line_str := self.find_first_by_field_name(node, 'line_matcher'):
             when.line_matcher = self.parse_string(line_str)
