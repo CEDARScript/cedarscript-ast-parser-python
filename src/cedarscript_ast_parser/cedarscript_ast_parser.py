@@ -8,7 +8,7 @@ from tree_sitter import Parser
 
 
 class ParseError(NamedTuple):
-    command_ordinal: int
+    ordinal: int
     message: str
     line: int
     column: int
@@ -17,10 +17,12 @@ class ParseError(NamedTuple):
     def __str__(self):
         line_msg = f'; LINE #{self.line}' if self.line else ''
         col_msg = f'; COLUMN #{self.column}' if self.column else ''
+        cmd_or_block = 'BLOCK' if self.line else 'COMMAND'
+        error_type = 'Source Parsing' if self.line else 'CST Parsing'
         suggestion_msg = f'{self.suggestion} ' if self.suggestion else ''
         return (
-            f"<error-details><error-location>COMMAND #{self.command_ordinal}{line_msg}{col_msg}</error-location>"
-            f"<type>PARSING (no commands were applied at all)</type><description>{self.message}</description>"
+            f"<error-details><error-location>{cmd_or_block} #{self.ordinal}{line_msg}{col_msg}</error-location>"
+            f"<type>{error_type} (no commands were applied at all)</type><description>{self.message}</description>"
             f"<suggestion>{suggestion_msg}"
             "(NEVER apologize; just take a deep breath, re-read grammar rules (enclosed by <grammar.js> tags) "
             "and fix you CEDARScript syntax)</suggestion></error-details>"
@@ -60,7 +62,9 @@ class Marker(MarkerCompatible):
     type: MarkerType
     value: str
     offset: int | None = None
-    marker_subtype: str | None = None  # 'REGEX', 'PREFIX', 'SUFFIX' for LINE type
+
+    # See `line_base`
+    marker_subtype: str | None = None
 
     @property
     def as_marker(self) -> 'Marker':
@@ -71,10 +75,13 @@ class Marker(MarkerCompatible):
         match self.marker_subtype:
             case 'string' | None:
                 pass
+            case 'empty':
+                result = 'empty line'
             case _:
-                result += self.marker_subtype
+                result += f' {self.marker_subtype}'
 
-        result += f" '{self.value.strip()}'"
+        if self.marker_subtype != 'empty':
+            result += f" '{self.value.strip()}'"
         if self.offset is not None:
             result += f" at offset {self.offset}"
         return result
@@ -243,11 +250,12 @@ class LoopControl(StrEnum):
 class CaseWhen:
     """Represents a WHEN condition in a CASE statement"""
     empty: bool = False
+    indent_level: int | None = None
+    line_number: int | None = None
+    line_matcher: str | None = None
     regex: str | None = None
     prefix: str | None = None
     suffix: str | None = None
-    indent_level: int | None = None
-    line_number: int | None = None
 
 
 @dataclass
@@ -360,7 +368,7 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
             for child in root_node.children:
                 node_type = child.type.casefold()
                 if node_type == 'comment':
-                    print("(COMMENT) " + self.parse_string(child).removeprefix("--").strip())
+                    print("(COMMENT) " + self.parse_string(child).removeprefix("--").removeprefix("/*").strip())
                 if not node_type.endswith('_command'):
                     continue
                 commands.append(self.parse_command(child))
@@ -371,7 +379,7 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
             # Handle any unexpected exceptions during parsing
             error_message = str(e)
             error = ParseError(
-                command_ordinal=command_ordinal,
+                ordinal=command_ordinal,
                 message=error_message,
                 line=0,
                 column=0,
@@ -399,7 +407,7 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
                 suggestion = _generate_suggestion(node, code_text)
 
                 error = ParseError(
-                    command_ordinal=command_ordinal,
+                    ordinal=command_ordinal,
                     message=message,
                     line=line,
                     column=column,
@@ -474,10 +482,10 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
                 raise ValueError(f"[parse_update_target] Invalid target: {invalid}")
 
     def parse_identifier_from_file(self, node):
-        identifier_marker = self.find_first_by_type(node.named_children, 'identifierMarker')
-        identifier_type = MarkerType(identifier_marker.children[0].type.casefold())
-        name = self.parse_string(identifier_marker.named_children[0])
-        offset_clause = self.find_first_by_type(identifier_marker.named_children, 'offset_clause')
+        identifier_matcher = self.find_first_by_type(node.named_children, 'identifier_matcher')
+        identifier_type = MarkerType(identifier_matcher.children[0].type.casefold())
+        name = self.parse_string(identifier_matcher.named_children[0])
+        offset_clause = self.find_first_by_type(identifier_matcher.named_children, 'offset_clause')
         file_clause = self.find_first_by_type(node.named_children, 'singlefile_clause')
         where_clause = self.find_first_by_type(node.named_children, 'where_clause')
 
@@ -485,7 +493,7 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
             raise ValueError("Invalid identifier_from_file clause")
 
         file_path = self.parse_singlefile_clause(file_clause).file_path
-        offset = self.parse_offset_clause(offset_clause) if offset_clause else None
+        offset = self.find_primitive(offset_clause) if offset_clause else None
         where = self.parse_where_clause(where_clause)
 
         return IdentifierFromFile(file_path=file_path,
@@ -579,7 +587,7 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
                 node = node.named_children[0]
 
         match node.type.casefold():
-            case 'marker' | 'linemarker' | 'identifiermarker':
+            case 'marker' | 'line_matcher' | 'identifier_matcher':
                 result = self.parse_marker(node)
             case 'segment':
                 result = self.parse_segment(node)
@@ -596,27 +604,25 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
         if node.type.casefold() == 'marker':
             node = node.named_children[0]
         
-        marker_type = node.children[0].type  # LINE, VARIABLE, FUNCTION, METHOD or CLASS
+        marker_type = node.named_children[0].type
+        # LINE, VARIABLE, FUNCTION, METHOD or CLASS
         marker_subtype = None
         value = None
 
-        if marker_type != 'LINE':  # VARIABLE, FUNCTION, METHOD or CLASS
-            value = self.parse_string(self.find_first_by_type(node.named_children, 'string'))
         # Handle the different marker types
-        else:
-            # Get the second child which is either a string/number or a subtype specifier
-            second_child = node.children[1]
-            marker_subtype = second_child.type
-            if second_child.type in ['string', 'number']:
-                match second_child.type:
-                    case 'string':
-                        value = self.parse_string(second_child)
-                    case _:
-                        value = second_child.text.decode('utf8')
-            else:  # REGEX, PREFIX, or SUFFIX
-                value = self.parse_string(node.children[2])
+        if marker_type == 'line_base':
+            marker_type = 'line'
+            # subtype: None, number, EMPTY, REGEX, PREFIX, SUFFIX, INDENT-LEVEL
+            line_base_node = node.named_children[0] # line_base
+            marker_subtype = [n.type.casefold() for n in line_base_node.children if n.type.casefold() != 'line'][0]
+            value = self.find_primitive(line_base_node)
 
-        offset = self.parse_offset_clause(self.find_first_by_type(node.named_children, 'offset_clause'))
+        else:  # identifier_matcher
+            marker_type = node.children[0].type.casefold()
+            value = self.find_primitive(node)
+
+        node1 = self.find_first_by_type(node.named_children, 'offset_clause')
+        offset = self.find_primitive(node1)
         return Marker(
             type=MarkerType(marker_type.casefold()),
             marker_subtype=marker_subtype,
@@ -631,16 +637,9 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
         end: RelativeMarker = self.parse_region(relpos_end)
         return Segment(start=start, end=end)
 
-    def parse_offset_clause(self, node):
-        if node is None:
-            return None
-        return int(self.find_first_by_type(node.children, 'number').text)
-
     def parse_relative_indentation(self, node) -> int | None:
         node = self.find_first_by_type(node.named_children, 'relative_indentation')
-        if node is None:
-            return None
-        return int(self.find_first_by_type(node.named_children, 'number').text)
+        return self.find_primitive(node)
 
     def parse_content(self, node) -> str | tuple[Region, int | None] | None:
         content = self.find_first_by_type(node.named_children, [
@@ -668,7 +667,7 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
         current_when = None
         for child in node.children:
             match child.type:
-                case 'case_when':
+                case 'line_base':
                     current_when = self.parse_case_when(child)
                 case 'case_action' if current_when is not None:
                     action = self.parse_case_action(child)
@@ -686,20 +685,28 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
     def parse_case_when(self, node) -> CaseWhen:
         """Parse a WHEN clause in a CASE statement"""
         when = CaseWhen()
-        
+
         if self.find_first_by_field_name(node, 'empty'):
             when.empty = True
-        elif regex := self.find_first_by_field_name(node, 'regex'):
-            when.regex = re.compile(self.parse_string(regex))
-        elif prefix := self.find_first_by_field_name(node, 'prefix'):
-            when.prefix = self.parse_string(prefix)
-        elif suffix := self.find_first_by_field_name(node, 'suffix'):
-            when.suffix = self.parse_string(suffix)
+
         elif indent := self.find_first_by_field_name(node, 'indent_level'):
             when.indent_level = int(indent.text)
+
         elif line_num := self.find_first_by_field_name(node, 'line_number'):
             when.line_number = int(line_num.text)
-            
+
+        elif line_str := self.find_first_by_field_name(node, 'line_matcher'):
+            when.line_matcher = self.parse_string(line_str)
+
+        elif regex := self.find_first_by_field_name(node, 'regex'):
+            when.regex = re.compile(self.parse_string(regex))
+
+        elif prefix := self.find_first_by_field_name(node, 'prefix'):
+            when.prefix = self.parse_string(prefix)
+
+        elif suffix := self.find_first_by_field_name(node, 'suffix'):
+            when.suffix = self.parse_string(suffix)
+
         return when
 
     def parse_case_action(self, node) -> CaseAction:
@@ -774,6 +781,20 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
         if value_node is None:
             raise ValueError("No value found in to_value_clause")
         return self.parse_string(value_node)
+
+    def find_primitive(self, node):
+        if node is None:
+            return None
+        node = self.find_first_by_type(node.named_children, ['string', 'number'])
+        if node is None:
+            return None
+        match node.type.casefold():
+            case 'string':
+                return self.parse_string(node)
+            case 'number':
+                return int(node.text)
+            case _:
+                raise ValueError(f"[find_primitive] Invalid primitive: {node.type} ({node.text})")
 
     @staticmethod
     def parse_string(node):
