@@ -150,7 +150,7 @@ class IdentifierFromFile(SingleFileClause, MarkerCompatible):
         result = f"{str(self.identifier_type).lower()} {self.name}{wc}"
         if self.offset is not None:
             result += f" at offset {self.offset}"
-        return f"{result} from file {self.file_path}"
+        return f"{result} [{str(self.file_path).split('/')[-1]}]"
 
 
 FileOrIdentifierWithin: TypeAlias = SingleFileClause | IdentifierFromFile
@@ -195,7 +195,6 @@ class MoveClause(DeleteClause, InsertClause):
 EditingAction: TypeAlias = ReplaceClause | DeleteClause | InsertClause | MoveClause
 
 # </editing-clause>
-
 
 # <command>
 
