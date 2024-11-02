@@ -268,16 +268,18 @@ class CaseAction:
     indent: int | None = None
     content: Optional[str | tuple[Region, int | None]] = None
 
+class LineFilter:
+    pass
 
 @dataclass
-class CaseStatement:
+class CaseStatement(LineFilter):
     """Represents a CASE statement with when-then pairs and optional else"""
     cases: list[tuple[CaseWhen, CaseAction]]
     else_action: Optional[CaseAction] = None
 
 
 @dataclass
-class EdScript:
+class EdScript(LineFilter):
     """Represents an ED script content"""
     script: str
 
@@ -643,7 +645,7 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
 
     def parse_content(self, node) -> str | tuple[Region, int | None] | None:
         content = self.find_first_by_type(node.named_children, [
-            'content_literal', 'content_from_segment', 'ed_stmt', 'case_stmt'
+            'content_literal', 'content_from_segment', 'line_filter'
         ])
         if not content:
             return None
@@ -652,12 +654,26 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
                 return self.parse_content_literal(content)  # str
             case 'content_from_segment':
                 return self.parse_content_from_segment_clause(content)  # tuple[Region, int]
-            case 'ed_stmt':
-                return self.parse_ed_stmt(content)  # EdScript
-            case 'case_stmt':
-                return self.parse_case_stmt(content)  # CaseStatement
+            case 'line_filter':
+                return self.parse_line_filter(content)
             case _:
                 raise ValueError(f"Invalid content type: {content.type}")
+
+    def parse_line_filter(self, node) -> LineFilter:
+        node = node.named_children[0]
+        match node.type:
+            case 'ed_stmt':
+                return self.parse_ed_stmt(node)  # EdScript
+            case 'case_stmt':
+                return self.parse_case_stmt(node)  # CaseStatement
+
+
+    def parse_ed_stmt(self, node) -> EdScript:
+        """Parse an ED script statement"""
+        ed_script = self.find_first_by_type(node.children, 'string')
+        if ed_script is None:
+            raise ValueError("No ED script found in ed_stmt")
+        return EdScript(script=self.parse_string(ed_script))
 
     def parse_case_stmt(self, node) -> CaseStatement:
         """Parse a CASE statement"""
@@ -737,13 +753,6 @@ class CEDARScriptASTParser(_CEDARScriptASTParserBase):
                 action.content = self.parse_content(content)
 
         return action
-
-    def parse_ed_stmt(self, node) -> EdScript:
-        """Parse an ED script statement"""
-        ed_script = self.find_first_by_type(node.children, 'string')
-        if ed_script is None:
-            raise ValueError("No ED script found in ed_stmt")
-        return EdScript(script=self.parse_string(ed_script))
 
     def parse_singlefile_clause(self, node):
         if node is None or node.type != 'singlefile_clause':
