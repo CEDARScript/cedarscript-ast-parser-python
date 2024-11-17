@@ -12,11 +12,11 @@ dynamic = ["version"]
 description = "A library for parsing and interpreting CEDARScript, a SQL-like language for code analysis and transformations"
 authors = [{ name = "Elifarley", email = "cedarscript@orgecc.com" }]
 readme = "README.md"
-license = {text = "MIT"}
+license = {text = "AGPL-3.0"}
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Operating System :: OS Independent",
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -26,7 +26,7 @@ classifiers = [
 ]
 keywords = ["parser", "ast", "cedarscript", "code-editing", "refactoring", "code-analysis", "sql-like", "ai-assisted-development"]
 dependencies = [
-    "cedarscript-grammar>=0.5.1",
+    "cedarscript-grammar>=0.5.2",
 ]
 requires-python = ">=3.8"
 

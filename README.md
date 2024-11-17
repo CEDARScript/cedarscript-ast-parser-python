@@ -3,7 +3,7 @@
 [![PyPI version](https://badge.fury.io/py/cedarscript-ast-parser.svg)](https://pypi.org/project/cedarscript-ast-parser/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/cedarscript-ast-parser.svg)](https://pypi.org/project/cedarscript-ast-parser/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
 `CEDARScript AST Parser` is a Python library for parsing and interpreting `CEDARScript`, a SQL-like language designed for concise code analysis, manipulation, and refactoring tasks.
 
