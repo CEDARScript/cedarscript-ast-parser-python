@@ -3,9 +3,7 @@
 ci: clean install test
 all: ci build version
 
-dist d: all ci.dist
-
-ci.dist:
+dist d: all
 	scripts/check-version.sh
 	twine upload dist/*
 

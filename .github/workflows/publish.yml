@@ -36,11 +36,12 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.x'
+          python-version: '3.12'
 
       - name: Verify tag version matches package version
         run: |
-          pip install twine
+          python -m pip install --upgrade pip
+          pip install build pytest pytest-cov setuptools_scm twine
           PACKAGE_VERSION=$(python -m setuptools_scm)
           TAG_VERSION=${GITHUB_REF#refs/tags/}  # Remove 'refs/tags/' prefix
           if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
@@ -53,14 +54,14 @@ jobs:
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
-        run: twine upload --repository testpypi dist/*
+        run: make all && twine upload --repository testpypi dist/*
 
       - name: Publish to PyPI
         if: "!contains(github.ref, 'test')"
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: make ci.dist
+        run: make dist
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
