@@ -1,8 +1,11 @@
 .PHONY: all dist d clean c version v install i test t build b
 
-all: clean install test build version
+ci: clean install test
+all: ci build version
 
-dist d: all
+dist d: all ci.dist
+
+ci.dist:
 	scripts/check-version.sh
 	twine upload dist/*
 
