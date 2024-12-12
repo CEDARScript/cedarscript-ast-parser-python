@@ -5,7 +5,7 @@ all: ci build version
 
 dist d: all
 	scripts/check-version.sh
-	twine upload dist/*
+	twine upload $$(test -e ~/.pypirc && echo '--config-file ~/.pypirc') dist/*
 
 clean c:
 	rm -rfv out dist build/bdist.* build/lib/cedarscript*
